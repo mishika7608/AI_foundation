@@ -1,61 +1,39 @@
-# lanchain kernel -> load api key %dotenv-magic command -> messages(dictionary lsu: to specify promsts as system(direct model-defines purpose, persona), user, assistant , tool)
-from langchain_community.chat_models import ChatOllama
-from langchain_core.prompts import (
-    ChatPromptTemplate,
-    HumanMessagePromptTemplate,
-    AIMessagePromptTemplate,
-    FewShotChatMessagePromptTemplate
-)
+from pypdf import PdfReader #lightweight pdf reader 
+from langchain_core.documents import Document #imports standard container
+import copy
+import re
 
-# 1️ Initialize Ollama chat model
-chat = ChatOllama(
-    model="qwen2:0.5b",
-    temperature=0.0,
-    num_predict=100
-)
+#loader_pdf = PyPDFLoader(r"D:\PythonFolder\nlp_foundation\Introduction_to_Data_and_Data_Science.pdf")
+# pages_pdf = loader_pdf.load()
+# print(pages_pdf)
 
-# 2️ Templates (same logic as yours)
-TEMPLATE_H = "I've recently adopted a {pet}. Could you suggest some {pet} names"
-TEMPLATE_AI = "{response}"
-
-message_template_h = HumanMessagePromptTemplate.from_template(TEMPLATE_H)
-message_template_ai = AIMessagePromptTemplate.from_template(TEMPLATE_AI)
-
-# 3️ Example template (Human → AI)
-example_template = ChatPromptTemplate.from_messages([
-    message_template_h,
-    message_template_ai
-])
-
-# 4️ Few-shot examples
-examples = [
-    {
-        "pet": "dog",
-        "response": (
-            "Oh, absolutely. Because nothing screams "
-            "'I'm a responsible pet owner' like asking a chatbot "
-            "to name your furball. How about 'Bark Twain'?"
+reader = PdfReader(r"D:\PythonFolder\nlp_foundation\Introduction_to_Data_and_Data_Science.pdf")
+documents = []
+for i, page in enumerate(reader.pages):
+    text = page.extract_text() #extract raw text, and none if empty or image
+    if text:
+        documents.append(
+            Document( #craetes langchain compatible document object 
+                page_content=text, #used for chunking, embedding, RAG
+                metadata={"page":i} #source citation, page preferences, debugging
+            )
         )
-    }
-]
+print(documents)
+raw_documents = documents
+cleaned_documents = copy.deepcopy(raw_documents)
 
-few_shot_prompt = FewShotChatMessagePromptTemplate(
-    examples=examples,
-    example_prompt=example_template
-)
 
-# 5️ Final chat prompt
-chat_template = ChatPromptTemplate.from_messages([
-    few_shot_prompt,
-    message_template_h
-])
+def clean_text(text: str) -> str:
+    # Remove excessive whitespace (newlines, tabs, etc.)
+    text = re.sub(r"\s+", " ", text)
 
-# 6️ Invoke the prompt
-messages = chat_template.format_messages(
-    pet="rabbit"
-)
+    # Remove non-printable characters
+    text = re.sub(r"[^\x20-\x7E]", "", text)
 
-response = chat.invoke(messages)
+    return text.strip()
 
-# 7️ Print result
-print(response.content)
+for doc in cleaned_documents:
+    doc.page_content = clean_text(doc.page_content)
+
+print(raw_documents[0].page_content[:200])
+print(cleaned_documents[0].page_content[:200])
