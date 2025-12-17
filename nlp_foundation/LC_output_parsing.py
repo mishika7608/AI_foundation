@@ -27,8 +27,8 @@ print("Type:",type(csv_result))
 date_parser = StrOutputParser()
 
 date_prompt = ChatPromptTemplate.from_messages([
-    ("system", "Return ONLY a date in ISO format (YYYY-MM-DD)."),
-    ("human", "What was habit tracking app 'Finch' published?")
+    ("system", "You are a strict formatter. Return ONLY a date in ISO-8601 format (YYYY-MM-DD).No text."),
+    ("human", "When did the first recorded volcano erupt?")
 ])
 
 chain = date_prompt | llm | date_parser
