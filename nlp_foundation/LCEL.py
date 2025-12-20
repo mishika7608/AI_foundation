@@ -42,26 +42,6 @@
 # STREAMING
 # Generator function - allow functions that behave like iterators, allowing us to loop over output - > give yield statement instead of return statements(standarad function )
 # LCEL - piped components to form chains
-from dotenv import load_dotenv
-load_dotenv()
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
-
-chat = ChatGroq(
-    model = "llama-3.1-8b-instant",
-    temperature=0.8
-)
-
-chat_template = chat_template = ChatPromptTemplate.from_messages([('human','I have recently adopted a {pet} wich is a {breed}. Could you suggest several training tips?')])
-
-chain = chat_template | chat
-
-response = chain.stream({'pet':'dragon', 'breed':'night fury'})
-next(response)
-for i in response:
-    print(i.content, end = '')
-
-# # BATCHING
 # from dotenv import load_dotenv
 # load_dotenv()
 # from langchain_groq import ChatGroq
@@ -76,13 +56,33 @@ for i in response:
 
 # chain = chat_template | chat
 
-# # print(chain.invoke({'pet':'dog', 'breed':'pomerian'})) #invoke doesnt allow us to feed multiple inputs at once(more time consuming) -> batch runs invoke in parallel (less time consuming)
+# response = chain.stream({'pet':'dragon', 'breed':'night fury'})
+# next(response)
+# for i in response:
+#     print(i.content, end = '')
+
+# # BATCHING
+from dotenv import load_dotenv
+load_dotenv()
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
+
+chat = ChatGroq(
+    model = "llama-3.1-8b-instant",
+    temperature=0.8
+)
+
+chat_template = chat_template = ChatPromptTemplate.from_messages([('human','I have recently adopted a {pet} wich is a {breed}. Could you suggest several training tips?')])
+
+chain = chat_template | chat
+
+# print(chain.invoke({'pet':'dog', 'breed':'pomerian'})) #invoke doesnt allow us to feed multiple inputs at once(more time consuming) -> batch runs invoke in parallel (less time consuming)
 
 
-# print(chain.batch([{'pet':'dog', 'breed':'pomerian'},
-#                    {'pet':'koala','breed':'brown koala'}])) # wall times- batch invoke time is less than both 1 invoke and 2 invoke 
-# print(chain.invoke({'pet':'dog', 'breed':'pomerian'}))
-# print(chain.invoke({'pet':'koala', 'breed':'brown koala'}))
+print(chain.batch([{'pet':'dog', 'breed':'pomerian'},
+                   {'pet':'koala','breed':'brown koala'}])) # wall times- batch invoke time is less than both 1 invoke and 2 invoke 
+print(chain.invoke({'pet':'dog', 'breed':'pomerian'}))
+print(chain.invoke({'pet':'koala', 'breed':'brown koala'}))
 
 #PIPING
 
