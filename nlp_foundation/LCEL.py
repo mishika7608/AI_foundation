@@ -1,55 +1,65 @@
-from dotenv import load_dotenv
-load_dotenv()
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnableParallel
+# RUNNABLE LAMBDA
+from langchain_core.runnables import RunnableLambda
+find_sum = lambda x : sum(x)
+find_square = lambda x : x**2
+print(find_square(4))
+print(find_sum([1,4,6,7]))
+runnable_sum = RunnableLambda(lambda x : sum(x))
+runnable_square = RunnableLambda(lambda x : x**2)
+runnable_sum.invoke([1,2,5])
+runnable_square.invoke(8)
+chain = runnable_sum | runnable_square
+print(chain.invoke([1,2,5]))
 
-chat_template_books = ChatPromptTemplate.from_template('''Suggest three of best intermediate-level {programming language} books.
-                                                       Answer only by listing the books.
-                                         ''')
-chat_template_projects = ChatPromptTemplate.from_template('''Suggest three interesting {programming language} projects under intermediate-level programmers.
-                                                       Answer only by listing the projects.''')
-
-chat_template_time = ChatPromptTemplate.from_template(
-    '''
-    I am an intermediate level programmer.
-    Consider the following literature:{books}
-    Also, consider the following projects: {projects}
-    Roughly, how much time would it take me to complete literature and the projects?
-    '''
-)
-
-chat = ChatGroq(
-    model = "llama-3.1-8b-instant",
-    temperature=0.8,
-    max_tokens=500
-)
-
-string_parser = StrOutputParser()
-
-chain_books = chat_template_books | chat | string_parser 
-chain_projects = chat_template_projects | chat | string_parser 
-
-chain_parallel = RunnableParallel({'books':chain_books,'prjects':chain_projects})
-print(chain_parallel.invoke({'programming language':'Python'}))
-
-chain_time1 = (RunnableParallel({'books':chain_books,
-                                'projects':chain_projects})| chat_template_time | chat | string_parser)
-chain_time2 = ({'books':chain_books,
-                                'projects':chain_projects}| chat_template_time | chat | string_parser)
-
-print(chain_time2.invoke({'programming language': 'python'}))
-
-print(chain_time2.get_graph().print_ascii()) #takes less time than consequent invokes
+print(chain.get_graph().print_ascii())
 
 
 
+# PARALLEL RUNNABLES AND PIPING OTHER RUNNABLES WITH IT
+# from dotenv import load_dotenv
+# load_dotenv()
+# from langchain_groq import ChatGroq
+# from langchain_core.prompts import ChatPromptTemplate
+# from langchain_core.output_parsers import StrOutputParser
+# from langchain_core.runnables import RunnableParallel
 
+# chat_template_books = ChatPromptTemplate.from_template('''Suggest three of best intermediate-level {programming language} books.
+#                                                        Answer only by listing the books.
+#                                          ''')
+# chat_template_projects = ChatPromptTemplate.from_template('''Suggest three interesting {programming language} projects under intermediate-level programmers.
+#                                                        Answer only by listing the projects.''')
 
+# chat_template_time = ChatPromptTemplate.from_template(
+#     '''
+#     I am an intermediate level programmer.
+#     Consider the following literature:{books}
+#     Also, consider the following projects: {projects}
+#     Roughly, how much time would it take me to complete literature and the projects?
+#     '''
+# )
 
+# chat = ChatGroq(
+#     model = "llama-3.1-8b-instant",
+#     temperature=0.8,
+#     max_tokens=500
+# )
 
+# string_parser = StrOutputParser()
 
+# chain_books = chat_template_books | chat | string_parser 
+# chain_projects = chat_template_projects | chat | string_parser 
+
+# chain_parallel = RunnableParallel({'books':chain_books,'prjects':chain_projects})
+# print(chain_parallel.invoke({'programming language':'Python'}))
+
+# chain_time1 = (RunnableParallel({'books':chain_books,
+#                                 'projects':chain_projects})| chat_template_time | chat | string_parser)
+# chain_time2 = ({'books':chain_books,
+#                                 'projects':chain_projects}| chat_template_time | chat | string_parser)
+
+# print(chain_time2.invoke({'programming language': 'python'}))
+
+# print(chain_time2.get_graph().print_ascii()) #takes less time than consequent invokes
 
 
 # RUNNABLE AND RUNNABLE SEQUENCE CLASSES
