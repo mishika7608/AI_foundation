@@ -1,17 +1,44 @@
-# RUNNABLE LAMBDA
 from langchain_core.runnables import RunnableLambda
-find_sum = lambda x : sum(x)
-find_square = lambda x : x**2
-print(find_square(4))
-print(find_sum([1,4,6,7]))
-runnable_sum = RunnableLambda(lambda x : sum(x))
-runnable_square = RunnableLambda(lambda x : x**2)
-runnable_sum.invoke([1,2,5])
-runnable_square.invoke(8)
-chain = runnable_sum | runnable_square
-print(chain.invoke([1,2,5]))
+from langchain_core.runnables import chain
 
-print(chain.get_graph().print_ascii())
+def find_sum(x):
+    return sum(x)
+
+def find_square(x):
+    return x**2
+
+chain1 = RunnableLambda(find_sum) | RunnableLambda(find_square)
+chain1.invoke([1,2,5])
+
+@chain 
+def runnable_sum(x):
+    return sum(x)
+@chain 
+def runnable_square(x):
+    return x**2
+
+print(type(runnable_sum),type(runnable_square))
+
+chain2 = runnable_sum | runnable_square
+print(chain2.invoke([1,2,5]))
+
+
+
+ 
+# RUNNABLE LAMBDA
+# from langchain_core.runnables import RunnableLambda
+# find_sum = lambda x : sum(x)
+# find_square = lambda x : x**2 #anonymous func
+# print(find_square(4))
+# print(find_sum([1,4,6,7]))
+# runnable_sum = RunnableLambda(lambda x : sum(x))
+# runnable_square = RunnableLambda(lambda x : x**2)
+# runnable_sum.invoke([1,2,5])
+# runnable_square.invoke(8)
+# chain = runnable_sum | runnable_square
+# print(chain.invoke([1,2,5]))
+
+# print(chain.get_graph().print_ascii())
 
 
 
