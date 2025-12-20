@@ -3,12 +3,13 @@ load_dotenv()
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough #passes inputs through without alteration
+from langchain_core.runnables import RunnableParallel
 
-chat_template_tools = ChatPromptTemplate.from_template('''What are five most important tools a {job title} needs?
-                                         Answer only by listing the tools.
+chat_template_books = ChatPromptTemplate.from_template('''Suggest three of best intermediate-level {programming language} books.
+                                                       Answer only by listing the books.
                                          ''')
-chat_template_strategy = ChatPromptTemplate.from_template('''Considering tools provided, develop a strategy for effectively learning and mastering them: {tools}''')
+chat_template_projects = ChatPromptTemplate.from_template('''Suggest three interesting {programming language} projects under intermediate-level programmers.
+                                                       Answer only by listing the projects.''')
 chat = ChatGroq(
     model = "llama-3.1-8b-instant",
     temperature=0.8,
@@ -17,10 +18,12 @@ chat = ChatGroq(
 
 string_parser = StrOutputParser()
 
-chain_long = chat_template_tools | chat | string_parser | {'tools':RunnablePassthrough()} | chat_template_strategy | chat | string_parser
+chain_books = chat_template_books | chat | string_parser 
+chain_projects = chat_template_projects | chat | string_parser 
 
-print(chain_long.get_graph().print_ascii())
-
+chain_parallel = RunnableParallel({'books':chain_books,'prjects':chain_projects})
+print(chain_parallel.invoke({'programming language':'Python'}))
+print(chain_parallel.get_graph().print_ascii())
 
 
 
