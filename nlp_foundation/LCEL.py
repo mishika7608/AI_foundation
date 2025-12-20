@@ -10,10 +10,20 @@ chat_template_books = ChatPromptTemplate.from_template('''Suggest three of best 
                                          ''')
 chat_template_projects = ChatPromptTemplate.from_template('''Suggest three interesting {programming language} projects under intermediate-level programmers.
                                                        Answer only by listing the projects.''')
+
+chat_template_time = ChatPromptTemplate.from_template(
+    '''
+    I am an intermediate level programmer.
+    Consider the following literature:{books}
+    Also, consider the following projects: {projects}
+    Roughly, how much time would it take me to complete literature and the projects?
+    '''
+)
+
 chat = ChatGroq(
     model = "llama-3.1-8b-instant",
     temperature=0.8,
-    max_tokens=100
+    max_tokens=500
 )
 
 string_parser = StrOutputParser()
@@ -23,7 +33,15 @@ chain_projects = chat_template_projects | chat | string_parser
 
 chain_parallel = RunnableParallel({'books':chain_books,'prjects':chain_projects})
 print(chain_parallel.invoke({'programming language':'Python'}))
-print(chain_parallel.get_graph().print_ascii())
+
+chain_time1 = (RunnableParallel({'books':chain_books,
+                                'projects':chain_projects})| chat_template_time | chat | string_parser)
+chain_time2 = ({'books':chain_books,
+                                'projects':chain_projects}| chat_template_time | chat | string_parser)
+
+print(chain_time2.invoke({'programming language': 'python'}))
+
+print(chain_time2.get_graph().print_ascii()) #takes less time than consequent invokes
 
 
 
@@ -85,6 +103,7 @@ print(chain_parallel.get_graph().print_ascii())
 
 # chat = ChatGroq(
 #     model = "llama-3.1-8b-instant",
+#     model_kwargs={ "seed": 365 } #produces same output for same input every time
 #     temperature=0.8
 # )
 
