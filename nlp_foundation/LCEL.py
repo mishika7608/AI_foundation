@@ -2,64 +2,64 @@
 # Prompt template, chat model, output parser are instances of runnable class
 #chatPrompt Template strats with runnable inherits invoke, betch, stream
 # Runnable - unit of work that can invoked, batched, streamed, transformed, composed(link together formulating change and change is also runnable) -> has 2 classes runnable and runnable sequence runnable pass through(to pipe chains)
-from dotenv import load_dotenv
-load_dotenv()
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough #passes inputs through without alteration
+# from dotenv import load_dotenv
+# load_dotenv()
+# from langchain_groq import ChatGroq
+# from langchain_core.prompts import ChatPromptTemplate
+# from langchain_core.output_parsers import StrOutputParser
+# from langchain_core.runnables import RunnablePassthrough #passes inputs through without alteration
 
-RunnablePassthrough().invoke([1,2,3])
-RunnablePassthrough().invoke("HEllo World")
+# RunnablePassthrough().invoke([1,2,3])
+# RunnablePassthrough().invoke("HEllo World")
 
-chat_template_tools = ChatPromptTemplate.from_template('''What are five most important tools a {job title} needs?
-                                         Answer only by listing the tools.
-                                         ''')
-chat_template_strategy = ChatPromptTemplate.from_template('''Considering tools provided, develop a strategy for effectively learning and mastering them: {tools}''')
-chat = ChatGroq(
-    model = "llama-3.1-8b-instant",
-    temperature=0.8,
-    max_tokens=100
-)
+# chat_template_tools = ChatPromptTemplate.from_template('''What are five most important tools a {job title} needs?
+#                                          Answer only by listing the tools.
+#                                          ''')
+# chat_template_strategy = ChatPromptTemplate.from_template('''Considering tools provided, develop a strategy for effectively learning and mastering them: {tools}''')
+# chat = ChatGroq(
+#     model = "llama-3.1-8b-instant",
+#     temperature=0.8,
+#     max_tokens=100
+# )
 
-string_parser = StrOutputParser()
-chain_tools = chat_template_tools | chat | string_parser | {'tools':RunnablePassthrough()}
-chain_strategy = chat_template_strategy | chat | string_parser
-print(chain_tools.invoke({'job title': 'data scientist'}))
-print(chain_strategy.invoke({'tools': '''1. Python
-2. R
-3. Jupyter Notebook
-4. Pandas
-5. NumPy'''}))
-#merge chain_tool and strategy
-chain_combined = chain_tools | chain_strategy
-print(chain_combined.invoke({'job title': 'data scientist'}))
-
+# string_parser = StrOutputParser()
+# chain_tools = chat_template_tools | chat | string_parser | {'tools':RunnablePassthrough()}
+# chain_strategy = chat_template_strategy | chat | string_parser
+# print(chain_tools.invoke({'job title': 'data scientist'}))
+# print(chain_strategy.invoke({'tools': '''1. Python
+# 2. R
+# 3. Jupyter Notebook
+# 4. Pandas
+# 5. NumPy'''}))
+# #merge chain_tool and strategy
+# chain_combined = chain_tools | chain_strategy
+# print(chain_combined.invoke({'job title': 'data scientist'}))
+# chain_long = chat_template_tools | chat | string_parser | {'tools':RunnablePassthrough()} | chat_template_strategy | chat | string_parser #another way
 
 
 
 
 # STREAMING
-#Generator function - allow functions that behave like iterators, allowing us to loop over output - > give yield statement instead of return statements(standarad function )
-#LCEL - piped components to form chains
-# from dotenv import load_dotenv
-# load_dotenv()
-# from langchain_groq import ChatGroq
-# from langchain_core.prompts import ChatPromptTemplate
+# Generator function - allow functions that behave like iterators, allowing us to loop over output - > give yield statement instead of return statements(standarad function )
+# LCEL - piped components to form chains
+from dotenv import load_dotenv
+load_dotenv()
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
 
-# chat = ChatGroq(
-#     model = "llama-3.1-8b-instant",
-#     temperature=0.8
-# )
+chat = ChatGroq(
+    model = "llama-3.1-8b-instant",
+    temperature=0.8
+)
 
-# chat_template = chat_template = ChatPromptTemplate.from_messages([('human','I have recently adopted a {pet} wich is a {breed}. Could you suggest several training tips?')])
+chat_template = chat_template = ChatPromptTemplate.from_messages([('human','I have recently adopted a {pet} wich is a {breed}. Could you suggest several training tips?')])
 
-# chain = chat_template | chat
+chain = chat_template | chat
 
-# response = chain.stream({'pet':'dragon', 'breed':'night fury'})
-# next(response)
-# for i in response:
-#     print(i.content, end = '')
+response = chain.stream({'pet':'dragon', 'breed':'night fury'})
+next(response)
+for i in response:
+    print(i.content, end = '')
 
 # # BATCHING
 # from dotenv import load_dotenv
