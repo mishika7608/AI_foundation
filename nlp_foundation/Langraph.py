@@ -1,7 +1,7 @@
-# INVOKING AND VISUALIZING GRAPH WITH CONDITIONAL EDGES
+#USING MESSAGE STATE
 from dotenv import load_dotenv
 load_dotenv()
-from langgraph.graph import START, END, StateGraph, add_messages
+from langgraph.graph import START, END, StateGraph, add_messages, MessagesState
 from typing_extensions import TypedDict  #most used objects for defining schema of graph. Allow us to define dictionaries with explicitly declared keys. Type checkers will flag TypedDict with wnexpected keys. not enforced a runtime
 from langchain_groq.chat_models import ChatGroq
 from langchain_core.messages import HumanMessage, BaseMessage, AIMessage
@@ -9,44 +9,38 @@ from langchain_core.runnables import Runnable
 from collections.abc import Sequence
 from typing import Literal, Annotated
 
-#By default: state values replaces after each node.To keep memory we need to append the messages
-
-class State(TypedDict):
-    # add_messgae - reducer function defines how to combine current with new incoming data in structured way
-    messages : Annotated[Sequence[BaseMessage], add_messages] #annotated allows attachment of metadata.When stategraph updates field, new values merged instead of overwriting
-
 chat = ChatGroq(
     model = "llama-3.1-8b-instant",
     temperature=0.8,
     max_tokens=120
 )
-def ask_question(state: State) -> State:
+def ask_question(state: MessagesState) -> MessagesState:
     print("\n----->Ask a question")
     for i in state["messages"]:
         i.pretty_print()
     question = "What is your question?"
     print(question)
-    return State(messages = [AIMessage(question),HumanMessage(input())])
+    return MessagesState(messages = [AIMessage(question),HumanMessage(input())])
 
-def chatbot(state: State) -> State: 
+def chatbot(state: MessagesState) -> MessagesState: 
     print(f"\n--------->ENTERING Chatbot: ")
     for i in state["messages"]:
         i.pretty_print()
     response = chat.invoke(state["messages"])
     response.pretty_print()
 
-    return State(messages = [response])
+    return MessagesState(messages = [response])
 
-def ask_another_question(state: State) -> State:
+def ask_another_question(state: MessagesState) -> MessagesState:
     print("\n----->Ask another question")
     for i in state["messages"]:
         i.pretty_print()
     question = "Would you like to ask  one more question (yes/no)?"
     print(question)
-    return State(messages = [AIMessage(question),HumanMessage(input())])
+    return MessagesState(messages = [AIMessage(question),HumanMessage(input())])
 
 ### define a routing function
-def routing_function(state: State) -> Literal["ask_question"]:
+def routing_function(state: MessagesState) -> Literal["ask_question"]:
     last_message = state["messages"][-1]
     if last_message.content.lower() == 'yes':
         return "ask_question"
@@ -54,7 +48,7 @@ def routing_function(state: State) -> Literal["ask_question"]:
         return END
     
 # Define graph
-graph = StateGraph(State)
+graph = StateGraph(MessagesState)
 
 graph.add_node("ask_question",ask_question)
 graph.add_node("chatbot",chatbot)
@@ -68,7 +62,80 @@ graph.add_conditional_edges(source = "ask_another_question",path = routing_funct
         END: END
     })
 graph_compiled = graph.compile()
-graph_compiled.invoke(State(messages = []))
+graph_compiled.invoke(MessagesState(messages = []))
+
+
+#REDUCE FUNCTION to give context
+# from dotenv import load_dotenv
+# load_dotenv()
+# from langgraph.graph import START, END, StateGraph, add_messages
+# from typing_extensions import TypedDict  #most used objects for defining schema of graph. Allow us to define dictionaries with explicitly declared keys. Type checkers will flag TypedDict with wnexpected keys. not enforced a runtime
+# from langchain_groq.chat_models import ChatGroq
+# from langchain_core.messages import HumanMessage, BaseMessage, AIMessage
+# from langchain_core.runnables import Runnable
+# from collections.abc import Sequence
+# from typing import Literal, Annotated
+
+# #By default: state values replaces after each node.To keep memory we need to append the messages
+
+# class State(TypedDict):
+#     # add_messgae - reducer function defines how to combine current with new incoming data in structured way
+#     messages : Annotated[Sequence[BaseMessage], add_messages] #annotated allows attachment of metadata.When stategraph updates field, new values merged instead of overwriting
+
+# chat = ChatGroq(
+#     model = "llama-3.1-8b-instant",
+#     temperature=0.8,
+#     max_tokens=120
+# )
+# def ask_question(state: State) -> State:
+#     print("\n----->Ask a question")
+#     for i in state["messages"]:
+#         i.pretty_print()
+#     question = "What is your question?"
+#     print(question)
+#     return State(messages = [AIMessage(question),HumanMessage(input())])
+
+# def chatbot(state: State) -> State: 
+#     print(f"\n--------->ENTERING Chatbot: ")
+#     for i in state["messages"]:
+#         i.pretty_print()
+#     response = chat.invoke(state["messages"])
+#     response.pretty_print()
+
+#     return State(messages = [response])
+
+# def ask_another_question(state: State) -> State:
+#     print("\n----->Ask another question")
+#     for i in state["messages"]:
+#         i.pretty_print()
+#     question = "Would you like to ask  one more question (yes/no)?"
+#     print(question)
+#     return State(messages = [AIMessage(question),HumanMessage(input())])
+
+# ### define a routing function
+# def routing_function(state: State) -> Literal["ask_question"]:
+#     last_message = state["messages"][-1]
+#     if last_message.content.lower() == 'yes':
+#         return "ask_question"
+#     else:
+#         return END
+    
+# # Define graph
+# graph = StateGraph(State)
+
+# graph.add_node("ask_question",ask_question)
+# graph.add_node("chatbot",chatbot)
+# graph.add_node("ask_another_question",ask_another_question)
+
+# graph.add_edge(START,"ask_question")
+# graph.add_edge("ask_question","chatbot")
+# graph.add_edge("chatbot","ask_another_question")
+# graph.add_conditional_edges(source = "ask_another_question",path = routing_function,path_map={
+#         "ask_question": "ask_question",
+#         END: END
+#     })
+# graph_compiled = graph.compile()
+# graph_compiled.invoke(State(messages = []))
 
 
 
