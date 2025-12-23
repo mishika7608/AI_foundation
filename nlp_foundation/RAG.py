@@ -1,21 +1,20 @@
-# STORING
+# GENERATION - Stuffing Documents
 from dotenv import load_dotenv
 load_dotenv()
-from docx import Document as DocxDocument
-from langchain_core.documents import Document
+from langchain_community.document_loaders import Docx2txtLoader
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain_groq import ChatGroq
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough #passes inputs through without alteration
+from langchain_core.runnables import RunnableParallel
 from langchain_text_splitters.markdown import MarkdownHeaderTextSplitter
 from langchain_text_splitters.character import CharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
-import numpy as np
-from langchain_community.vectorstores import FAISS
 import re
 
-doc = DocxDocument(r"D:\PythonFolder\nlp_foundation\Introduction_to_Data_and_Data_Science.docx")
-full_text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
-pages = [Document(
-    page_content=full_text,
-    metadata={"source": "your_file.docx", "page": 1}
-)]
+loader_docx = Docx2txtLoader(r"D:\PythonFolder\nlp_foundation\Introduction_to_Data_and_Data_Science.docx")
+pages = loader_docx.load()
 md_splitter = MarkdownHeaderTextSplitter(headers_to_split_on = [("#", "course title"),("##", "lecture title")])
 pages_md_split = md_splitter.split_text(pages[0].page_content)
 
@@ -29,7 +28,8 @@ char_splitter = CharacterTextSplitter(
 )
 
 pages_char_split = char_splitter.split_documents(pages_md_split)
-# print(pages_char_split)
+
+
 
 embedding = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2"
@@ -38,44 +38,133 @@ vectorstore = FAISS.from_documents(
     documents=pages_char_split,
     embedding=embedding
 )
+
+# RETRIEVAL
 vectorstore.save_local("faiss_index")
-# print("Total vectors:", vectorstore.index.ntotal)
 vectorstore = FAISS.load_local(
     "faiss_index",
     embedding,
     allow_dangerous_deserialization=True
 )
-# print(vectorstore.index.ntotal)
+print(vectorstore.index.ntotal)
+retriever = vectorstore.as_retriever(search_type = 'mmr', search_kwrags = {'k':3,'lambda_mult':0.7})
+TEMPLATE = '''
+Answer the following question:
+{question}
 
-doc_id = vectorstore.index_to_docstore_id[0]
-doc = vectorstore.docstore.search(doc_id)
-# print(doc.page_content[:200])
-
-added_document = Document(
-    page_content="Alright! So... Lets discuss the not so obvious",
-    metadata={
-        "Course Title": "Introduction to Data and Data Science",
-        "Lecture title": "Analysis vs Analytics"
-    }
+To answer the question, use only the following context:
+{context}
+At the end of the response, specify the name of the lecture this context is taken format:
+Resources: *lecture title*
+where *lecture title* should be substituted with the title of all resource lectures 
+'''
+prompt_template = PromptTemplate.from_template(TEMPLATE)
+chat = ChatGroq(
+    model = "llama-3.1-8b-instant",
+    temperature=0.8,
+    max_tokens=100
 )
 
-vectorstore.add_documents([added_document])
+question = "What software do data science use?"
+chain = (
+    RunnableParallel(
+        {
+            "context": retriever,
+            "question": RunnablePassthrough()
+        }
+    )
+    | prompt_template
+    | chat
+    | StrOutputParser()
+)
+print(chain.invoke(question))
 
-question = "What software do data scientists use ?"
-#Semantic Similarity Serach algo - retrieve content related to user prompt(may retrieve duplcate vectors)
-# retrieved_docs = vectorstore.similarity_search(query=question, k=5) #k=no. of docs retrieved default=4
-#MAximal Marginal Relevant Serach - marginal relevance = similarity - (max(similarity)-> diversity(-ve of simlarity))
-# retrieved_docs = vectorstore.max_marginal_relevance_search(query=question, k=3,lambda_mult=0.1,filter={'Lecture title':'Programming Languages & Software Employed in Data Science - All the Tools You Need'}) #lambda--diversity -> lambda=1 no diversity
+
+
+
+
+
+
+# STORING
+# from dotenv import load_dotenv
+# load_dotenv()
+# from docx import Document as DocxDocument
+# from langchain_core.documents import Document
+# from langchain_text_splitters.markdown import MarkdownHeaderTextSplitter
+# from langchain_text_splitters.character import CharacterTextSplitter
+# from langchain_community.embeddings import HuggingFaceEmbeddings
+# import numpy as np
+# from langchain_community.vectorstores import FAISS
+# import re
+
+# doc = DocxDocument(r"D:\PythonFolder\nlp_foundation\Introduction_to_Data_and_Data_Science.docx")
+# full_text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
+# pages = [Document(
+#     page_content=full_text,
+#     metadata={"source": "your_file.docx", "page": 1}
+# )]
+# md_splitter = MarkdownHeaderTextSplitter(headers_to_split_on = [("#", "course title"),("##", "lecture title")])
+# pages_md_split = md_splitter.split_text(pages[0].page_content)
+
+# for i in range(len(pages_md_split)):
+#     pages_md_split[i].page_content = ' '.join(pages_md_split[i].page_content.split())
+
+# char_splitter = CharacterTextSplitter(
+#     separator=".",
+#     chunk_size=500,
+#     chunk_overlap=50
+# )
+
+# pages_char_split = char_splitter.split_documents(pages_md_split)
+# # print(pages_char_split)
+
+# embedding = HuggingFaceEmbeddings(
+#     model_name="sentence-transformers/all-MiniLM-L6-v2"
+# )
+# vectorstore = FAISS.from_documents(
+#     documents=pages_char_split,
+#     embedding=embedding
+# )
+
+# # RETRIEVAL
+# vectorstore.save_local("faiss_index")
+# # print("Total vectors:", vectorstore.index.ntotal)
+# vectorstore = FAISS.load_local(
+#     "faiss_index",
+#     embedding,
+#     allow_dangerous_deserialization=True
+# )
+# # print(vectorstore.index.ntotal)
+
+# doc_id = vectorstore.index_to_docstore_id[0]
+# doc = vectorstore.docstore.search(doc_id)
+# # print(doc.page_content[:200])
+
+# added_document = Document(
+#     page_content="Alright! So... Lets discuss the not so obvious",
+#     metadata={
+#         "Course Title": "Introduction to Data and Data Science",
+#         "Lecture title": "Analysis vs Analytics"
+#     }
+# )
+
+# vectorstore.add_documents([added_document])
+
+# question = "What software do data scientists use ?"
+# #Semantic Similarity Serach algo - retrieve content related to user prompt(may retrieve duplcate vectors)
+# # retrieved_docs = vectorstore.similarity_search(query=question, k=5) #k=no. of docs retrieved default=4
+# #MAximal Marginal Relevant Serach - marginal relevance = similarity - (max(similarity)-> diversity(-ve of simlarity))
+# # retrieved_docs = vectorstore.max_marginal_relevance_search(query=question, k=3,lambda_mult=0.1,filter={'Lecture title':'Programming Languages & Software Employed in Data Science - All the Tools You Need'}) #lambda--diversity -> lambda=1 no diversity
+# # for i in retrieved_docs:
+# #     print(f"Page-content:  {i.page_content} \n---------\n Lecture title: {i.metadata['lecture title']}\n")
+
+# retriever = vectorstore.as_retriever(search_type = 'mmr', serach_kwrags = {'k':3,'lambda_mult':0.7})
+# print (retriever)
+
+# retrieved_docs = retriever.invoke(question)
+
 # for i in retrieved_docs:
 #     print(f"Page-content:  {i.page_content} \n---------\n Lecture title: {i.metadata['lecture title']}\n")
-
-retriever = vectorstore.as_retriever(search_type = 'mmr', serach_kwrags = {'k':3,'lambda_mult':0.7})
-print (retriever)
-
-retrieved_docs = retriever.invoke(question)
-
-for i in retrieved_docs:
-    print(f"Page-content:  {i.page_content} \n---------\n Lecture title: {i.metadata['lecture title']}\n")
 
 
 
