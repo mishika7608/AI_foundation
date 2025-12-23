@@ -60,11 +60,20 @@ added_document = Document(
 )
 
 vectorstore.add_documents([added_document])
-print("Total vectors after add:", vectorstore.index.ntotal)
-doc_ids = list(vectorstore.index_to_docstore_id.values())[:1]
-vectorstore.delete(doc_ids)
-doc_ids = list(vectorstore.index_to_docstore_id.values())[:1]
-vectorstore.delete(doc_ids)
+
+question = "What programming languages do data scientists use ?"
+retrieved_docs = vectorstore.similarity_search(query=question, k=5) #k=no. of docs retrieved default=4
+
+for i in retrieved_docs:
+    print(f"Page-content:  {i.page_content} \n---------\n Lecture title: {i.metadata['lecture title']}\n")
+
+
+# VECTOR DELETION
+# print("Total vectors after add:", vectorstore.index.ntotal)
+# doc_ids = list(vectorstore.index_to_docstore_id.values())[:1]
+# vectorstore.delete(doc_ids)
+# doc_ids = list(vectorstore.index_to_docstore_id.values())[:1]
+# vectorstore.delete(doc_ids)
 
 
 
