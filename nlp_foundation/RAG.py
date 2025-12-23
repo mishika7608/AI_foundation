@@ -61,9 +61,11 @@ added_document = Document(
 
 vectorstore.add_documents([added_document])
 
-question = "What programming languages do data scientists use ?"
-retrieved_docs = vectorstore.similarity_search(query=question, k=5) #k=no. of docs retrieved default=4
-
+question = "What software do data scientists use ?"
+#Semantic Similarity Serach algo - retrieve content related to user prompt(may retrieve duplcate vectors)
+# retrieved_docs = vectorstore.similarity_search(query=question, k=5) #k=no. of docs retrieved default=4
+#MAximal Marginal Relevant Serach - marginal relevance = similarity - (max(similarity)-> diversity(-ve of simlarity))
+retrieved_docs = vectorstore.max_marginal_relevance_search(query=question, k=3,lambda_mult=0.1,filter={'Lecture title':'Programming Languages & Software Employed in Data Science - All the Tools You Need'}) #lambda--diversity -> lambda=1 no diversity
 for i in retrieved_docs:
     print(f"Page-content:  {i.page_content} \n---------\n Lecture title: {i.metadata['lecture title']}\n")
 
