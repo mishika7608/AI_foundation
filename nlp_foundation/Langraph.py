@@ -4,79 +4,84 @@ load_dotenv()
 from langgraph.graph import START, END, StateGraph, add_messages, MessagesState
 from typing_extensions import TypedDict  #most used objects for defining schema of graph. Allow us to define dictionaries with explicitly declared keys. Type checkers will flag TypedDict with wnexpected keys. not enforced a runtime
 from langchain_groq.chat_models import ChatGroq
-from langchain_core.messages import HumanMessage, BaseMessage, AIMessage, RemoveMessage
+from langchain_core.messages import HumanMessage,SystemMessage, BaseMessage, AIMessage, RemoveMessage
 from langchain_core.runnables import Runnable
 from collections.abc import Sequence
 from typing import Literal, Annotated
 
 class State(MessagesState):
     summary: str
+test_state = State()
+# test_state["summary"]
 
+test_state.get("summary","")
 
-my_list = add_messages([AIMessage("What is your question?"),
-                        HumanMessage("Could you tell me a grook by piet hein?"),
-                        AIMessage("Ceratinly! Here's a well known grook by Peat HEin...."),
-                        AIMessage("Would you like to ask one more question?"),
-                        HumanMessage("yes"),
-                        AIMessage("What is your question?"),
-                        HumanMessage("where was the poet born?"),
-                        AIMessage("Piet Hein was born in CopenHagen, Denmark, on December 16, 1905."),
-                        AIMessage("Would you like to ask one more question?")],
-                        [HumanMessage("yes")]
-                        )
-
-remove_messages = [RemoveMessage(id=i.id) for i in my_list[:-5]]
-add_messages(my_list, remove_messages) #remove messages by add_messages 
 chat = ChatGroq(
     model = "llama-3.1-8b-instant",
     temperature=0.8,
     max_tokens=120
 )
-def ask_question(state: MessagesState) -> MessagesState:
+def ask_question(state: State) -> State:
     print("\n----->Ask a question")
-    for i in state["messages"]:
-        i.pretty_print()
     question = "What is your question?"
     print(question)
-    return MessagesState(messages = [AIMessage(question),HumanMessage(input())])
+    return State(messages = [AIMessage(question),HumanMessage(input())])
 
-def chatbot(state: MessagesState) -> MessagesState: 
-    print(f"\n--------->ENTERING Chatbot: ")
-    for i in state["messages"]:
-        i.pretty_print()
-    response = chat.invoke(state["messages"])
+def chatbot(state: State) -> State:
+    print("\n---------> ENTERING Chatbot")
+
+    system_message = SystemMessage(
+        content=f"""Here's a quick summary of what's been discussed so far:
+{state.get("summary", "")}
+
+Keep this in mind as you answer the next question."""
+    )
+
+    response = chat.invoke([system_message] + list(state["messages"]))
     response.pretty_print()
 
-    return MessagesState(messages = [response])
+    return {
+        "messages": list(state["messages"]) + [response]
+    }
 
-def ask_another_question(state: MessagesState) -> MessagesState:
+def ask_another_question(state: State) -> State:
     print("\n----->Ask another question")
     for i in state["messages"]:
         i.pretty_print()
     question = "Would you like to ask  one more question (yes/no)?"
     print(question)
-    return MessagesState(messages = [AIMessage(question),HumanMessage(input())])
+    return State(messages = [AIMessage(question),HumanMessage(input())])
 
-def trim_messages(state: MessagesState) -> MessagesState:
+def summarize_and_delete(state: State) -> State:
     print(f"\n------------> ENTERING trim_messages: ")
-    remove_messages = [RemoveMessage(id=i.id) for i in state["messages"][:-5]]
-    return MessagesState(messages=remove_messages)
+    new_conversation = ""
+    for i in state["messages"]:
+        new_conversation += f"{i.type}:{i.content}\n\n"
+    summary_instructions = f'''update ongoing summary by incorporating the new lines of conversation below. Build upon the previous summary rather than repeating it so that the result reflests the most recent contexts and developments.
+    Previous Summary
+    {state.get("summary","")}
+    New Conversation
+    {new_conversation}'''
+    print(summary_instructions)
+    summary = chat.invoke([HumanMessage(summary_instructions)])
+    remove_messages = [RemoveMessage(id=i.id) for i in state["messages"][:]]
+    return State(messages=remove_messages, summary=summary.content)
 
 ### define a routing function
-def routing_function(state: MessagesState):
+def routing_function(state: State):
     last_message = state["messages"][-1]
 
     if last_message.content.lower() == "yes":
-        return "trim_messages"
+        return "summarize_and_delete"
     return END
     
 # Define graph
-graph = StateGraph(MessagesState)
+graph = StateGraph(State)
 
 graph.add_node("ask_question",ask_question)
 graph.add_node("chatbot",chatbot)
 graph.add_node("ask_another_question",ask_another_question)
-graph.add_node("trim_messages",trim_messages)
+graph.add_node("summarize_and_delete",summarize_and_delete)
 
 graph.add_edge(START,"ask_question")
 graph.add_edge("ask_question","chatbot")
@@ -85,16 +90,14 @@ graph.add_conditional_edges(
     "ask_another_question",
     routing_function,
     path_map={
-        "trim_messages": "trim_messages",
+        "summarize_and_delete": "summarize_and_delete",
         END: END
     }
 )
-graph.add_edge("trim_messages","ask_question")
+graph.add_edge("summarize_and_delete","ask_question")
 graph_compiled = graph.compile()
 graph_compiled.get_graph().draw_mermaid()
-graph_compiled.invoke(MessagesState(messages = []))
-
-
+graph_compiled.invoke(State(messages = []))
 
 # REMNOVE MESSAGES - TRIMMING
 # from dotenv import load_dotenv
@@ -106,6 +109,7 @@ graph_compiled.invoke(MessagesState(messages = []))
 # from langchain_core.runnables import Runnable
 # from collections.abc import Sequence
 # from typing import Literal, Annotated
+
 
 # my_list = add_messages([AIMessage("What is your question?"),
 #                         HumanMessage("Could you tell me a grook by piet hein?"),
@@ -157,12 +161,12 @@ graph_compiled.invoke(MessagesState(messages = []))
 #     return MessagesState(messages=remove_messages)
 
 # ### define a routing function
-# def routing_function(state: MessagesState) -> Literal["trim_messages"]:
+# def routing_function(state: MessagesState):
 #     last_message = state["messages"][-1]
-#     if last_message.content.lower() == 'yes':
-#         return "ask_question"
-#     else:
-#         return END
+
+#     if last_message.content.lower() == "yes":
+#         return "trim_messages"
+#     return END
     
 # # Define graph
 # graph = StateGraph(MessagesState)
@@ -175,10 +179,14 @@ graph_compiled.invoke(MessagesState(messages = []))
 # graph.add_edge(START,"ask_question")
 # graph.add_edge("ask_question","chatbot")
 # graph.add_edge("chatbot","ask_another_question")
-# graph.add_conditional_edges(source = "ask_another_question",path = routing_function,path_map={
-#         "ask_question": "ask_question",
+# graph.add_conditional_edges(
+#     "ask_another_question",
+#     routing_function,
+#     path_map={
+#         "trim_messages": "trim_messages",
 #         END: END
-#     })
+#     }
+# )
 # graph.add_edge("trim_messages","ask_question")
 # graph_compiled = graph.compile()
 # graph_compiled.get_graph().draw_mermaid()
