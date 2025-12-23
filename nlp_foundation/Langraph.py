@@ -1,15 +1,19 @@
+# INVOKING AND VISUALIZING GRAPH WITH CONDITIONAL EDGES
 from dotenv import load_dotenv
 load_dotenv()
-from langgraph.graph import START, END, StateGraph #StateGraph-our defd graph
+from langgraph.graph import START, END, StateGraph, add_messages
 from typing_extensions import TypedDict  #most used objects for defining schema of graph. Allow us to define dictionaries with explicitly declared keys. Type checkers will flag TypedDict with wnexpected keys. not enforced a runtime
 from langchain_groq.chat_models import ChatGroq
-from langchain_core.messages import HumanMessage, BaseMessage
+from langchain_core.messages import HumanMessage, BaseMessage, AIMessage
 from langchain_core.runnables import Runnable
 from collections.abc import Sequence
-from typing import Literal
+from typing import Literal, Annotated
+
+#By default: state values replaces after each node.To keep memory we need to append the messages
 
 class State(TypedDict):
-    messages : Sequence[BaseMessage] 
+    # add_messgae - reducer function defines how to combine current with new incoming data in structured way
+    messages : Annotated[Sequence[BaseMessage], add_messages] #annotated allows attachment of metadata.When stategraph updates field, new values merged instead of overwriting
 
 chat = ChatGroq(
     model = "llama-3.1-8b-instant",
@@ -18,11 +22,16 @@ chat = ChatGroq(
 )
 def ask_question(state: State) -> State:
     print("\n----->Ask a question")
-    print("What is your question?")
-    return State(messages = [HumanMessage(input())])
+    for i in state["messages"]:
+        i.pretty_print()
+    question = "What is your question?"
+    print(question)
+    return State(messages = [AIMessage(question),HumanMessage(input())])
 
 def chatbot(state: State) -> State: 
     print(f"\n--------->ENTERING Chatbot: ")
+    for i in state["messages"]:
+        i.pretty_print()
     response = chat.invoke(state["messages"])
     response.pretty_print()
 
@@ -30,8 +39,11 @@ def chatbot(state: State) -> State:
 
 def ask_another_question(state: State) -> State:
     print("\n----->Ask another question")
-    print("Would you like to ask  one more question (yes/no)?")
-    return State(messages = [HumanMessage(input())])
+    for i in state["messages"]:
+        i.pretty_print()
+    question = "Would you like to ask  one more question (yes/no)?"
+    print(question)
+    return State(messages = [AIMessage(question),HumanMessage(input())])
 
 ### define a routing function
 def routing_function(state: State) -> Literal["ask_question"]:
@@ -55,12 +67,78 @@ graph.add_conditional_edges(source = "ask_another_question",path = routing_funct
         "ask_question": "ask_question",
         END: END
     })
-# graph.add_conditional_edges(source = "ask_another_question",path = routing_function,path_map={"True":"ask_question","False":"__end__"}) #path_map={"True":"ask_question","False":"__end__"} -> to represent conditional(dashed edges) 
 graph_compiled = graph.compile()
-print(graph_compiled.get_graph().draw_ascii())
-
-##test the graph
 graph_compiled.invoke(State(messages = []))
+
+
+
+
+
+
+# INVOKING AND VISUALIZING GRAPH WITH CONDITIONAL EDGES
+# from dotenv import load_dotenv
+# load_dotenv()
+# from langgraph.graph import START, END, StateGraph, add_messages
+# from typing_extensions import TypedDict  #most used objects for defining schema of graph. Allow us to define dictionaries with explicitly declared keys. Type checkers will flag TypedDict with wnexpected keys. not enforced a runtime
+# from langchain_groq.chat_models import ChatGroq
+# from langchain_core.messages import HumanMessage, BaseMessage
+# from langchain_core.runnables import Runnable
+# from collections.abc import Sequence
+# from typing import Literal, Annotated
+
+# class State(TypedDict):
+#     messages : Sequence[BaseMessage] 
+
+# chat = ChatGroq(
+#     model = "llama-3.1-8b-instant",
+#     temperature=0.8,
+#     max_tokens=120
+# )
+# def ask_question(state: State) -> State:
+#     print("\n----->Ask a question")
+#     print("What is your question?")
+#     return State(messages = [HumanMessage(input())])
+
+# def chatbot(state: State) -> State: 
+#     print(f"\n--------->ENTERING Chatbot: ")
+#     response = chat.invoke(state["messages"])
+#     response.pretty_print()
+
+#     return State(messages = [response])
+
+# def ask_another_question(state: State) -> State:
+#     print("\n----->Ask another question")
+#     print("Would you like to ask  one more question (yes/no)?")
+#     return State(messages = [HumanMessage(input())])
+
+# ### define a routing function
+# def routing_function(state: State) -> Literal["ask_question"]:
+#     last_message = state["messages"][-1]
+#     if last_message.content.lower() == 'yes':
+#         return "ask_question"
+#     else:
+#         return END
+    
+# # Define graph
+# graph = StateGraph(State)
+
+# graph.add_node("ask_question",ask_question)
+# graph.add_node("chatbot",chatbot)
+# graph.add_node("ask_another_question",ask_another_question)
+
+# graph.add_edge(START,"ask_question")
+# graph.add_edge("ask_question","chatbot")
+# graph.add_edge("chatbot","ask_another_question")
+# graph.add_conditional_edges(source = "ask_another_question",path = routing_function,path_map={
+#         "ask_question": "ask_question",
+#         END: END
+#     })
+# # graph.add_conditional_edges(source = "ask_another_question",path = routing_function,path_map={"True":"ask_question","False":"__end__"}) #path_map={"True":"ask_question","False":"__end__"} -> to represent conditional(dashed edges) 
+# graph_compiled = graph.compile()
+# print(graph_compiled.get_graph().draw_ascii())
+
+# ##test the graph
+# graph_compiled.invoke(State(messages = []))
 
 
 # Langraph - helps build stateful, multi step application powered by LLMs eg: GPT(openai), Claude(Anthropic)
