@@ -1,20 +1,21 @@
-#SUMMARIZING MESSAGES TO MAINTAIN CONTEXT
+#THREADS- Collection of related checkpoints having thread id  (gives continuity and agent memory)
+#short term - thread scope memory (1 thread) (terminates on kernel restart,sytem shutdown)
+#long term - (<1 thread) (ext storage)
+
+
 from dotenv import load_dotenv
 load_dotenv()
-from langgraph.graph import START, END, StateGraph, add_messages, MessagesState
+from langgraph.graph import START, END, StateGraph, add_messages, MessagesState #MessagesState-built in state schema {"messages": list[BaseMessage]}
 from typing_extensions import TypedDict  #most used objects for defining schema of graph. Allow us to define dictionaries with explicitly declared keys. Type checkers will flag TypedDict with wnexpected keys. not enforced a runtime
 from langchain_groq.chat_models import ChatGroq
 from langchain_core.messages import HumanMessage,SystemMessage, BaseMessage, AIMessage, RemoveMessage
 from langchain_core.runnables import Runnable
 from collections.abc import Sequence
 from typing import Literal, Annotated
+from langgraph.checkpoint.memory import InMemorySaver #add in-memory checkpoints to graph, enabling saving and retrieving
 
 class State(MessagesState):
-    summary: str
-test_state = State()
-# test_state["summary"]
-
-test_state.get("summary","")
+    summary: str 
 
 chat = ChatGroq(
     model = "llama-3.1-8b-instant",
@@ -30,74 +31,156 @@ def ask_question(state: State) -> State:
 def chatbot(state: State) -> State:
     print("\n---------> ENTERING Chatbot")
 
-    system_message = SystemMessage(
-        content=f"""Here's a quick summary of what's been discussed so far:
+    system_message = f"""Here's a quick summary of what's been discussed so far:
 {state.get("summary", "")}
 
 Keep this in mind as you answer the next question."""
-    )
-
-    response = chat.invoke([system_message] + list(state["messages"]))
+    
+    response = chat.invoke([SystemMessage(system_message)] + state["messages"])
     response.pretty_print()
-
-    return {
-        "messages": list(state["messages"]) + [response]
-    }
-
-def ask_another_question(state: State) -> State:
-    print("\n----->Ask another question")
-    for i in state["messages"]:
-        i.pretty_print()
-    question = "Would you like to ask  one more question (yes/no)?"
-    print(question)
-    return State(messages = [AIMessage(question),HumanMessage(input())])
+    return State(messages=[response])
+    
 
 def summarize_and_delete(state: State) -> State:
-    print(f"\n------------> ENTERING trim_messages: ")
+    print(f"\n------------> ENTERING summarized_messages: ")
     new_conversation = ""
     for i in state["messages"]:
         new_conversation += f"{i.type}:{i.content}\n\n"
-    summary_instructions = f'''update ongoing summary by incorporating the new lines of conversation below. Build upon the previous summary rather than repeating it so that the result reflests the most recent contexts and developments.
+    summary_instructions = f'''update ongoing summary by incorporating the new lines of conversation below. Build upon the previous summary rather than repeating it so that the result reflects the most recent contexts and developments.
     Previous Summary
     {state.get("summary","")}
     New Conversation
     {new_conversation}'''
     print(summary_instructions)
     summary = chat.invoke([HumanMessage(summary_instructions)])
+    summary.pretty_print()
     remove_messages = [RemoveMessage(id=i.id) for i in state["messages"][:]]
     return State(messages=remove_messages, summary=summary.content)
-
-### define a routing function
-def routing_function(state: State):
-    last_message = state["messages"][-1]
-
-    if last_message.content.lower() == "yes":
-        return "summarize_and_delete"
-    return END
     
 # Define graph
 graph = StateGraph(State)
 
 graph.add_node("ask_question",ask_question)
 graph.add_node("chatbot",chatbot)
-graph.add_node("ask_another_question",ask_another_question)
 graph.add_node("summarize_and_delete",summarize_and_delete)
 
 graph.add_edge(START,"ask_question")
 graph.add_edge("ask_question","chatbot")
-graph.add_edge("chatbot","ask_another_question")
-graph.add_conditional_edges(
-    "ask_another_question",
-    routing_function,
-    path_map={
-        "summarize_and_delete": "summarize_and_delete",
-        END: END
-    }
-)
-graph.add_edge("summarize_and_delete","ask_question")
-graph_compiled = graph.compile()
-graph_compiled.get_graph().draw_mermaid()
-graph_compiled.invoke(State(messages = []))
+graph.add_edge("chatbot","summarize_and_delete")
+graph.add_edge("summarize_and_delete",END)
+checkpointer = InMemorySaver()
+graph_compiled = graph.compile(checkpointer)
+config1 = {"configurable":{"thread_id":'1'}}
+graph_compiled.invoke(State(), config1)
+
+
+
+
+
+
+
+#what is strore in state["messages"]
+#SUMMARIZING MESSAGES TO MAINTAIN CONTEXT
+# from dotenv import load_dotenv
+# load_dotenv()
+# from langgraph.graph import START, END, StateGraph, add_messages, MessagesState #MessagesState-built in state schema {"messages": list[BaseMessage]}
+# from typing_extensions import TypedDict  #most used objects for defining schema of graph. Allow us to define dictionaries with explicitly declared keys. Type checkers will flag TypedDict with wnexpected keys. not enforced a runtime
+# from langchain_groq.chat_models import ChatGroq
+# from langchain_core.messages import HumanMessage,SystemMessage, BaseMessage, AIMessage, RemoveMessage
+# from langchain_core.runnables import Runnable
+# from collections.abc import Sequence
+# from typing import Literal, Annotated
+
+# class State(MessagesState):
+#     summary: str # maintains long term memory
+
+# test_state = State()
+# # test_state["summary"] #crashes as initially no summary is there
+
+# test_state.get("summary","") #get prevents crash
+
+# chat = ChatGroq(
+#     model = "llama-3.1-8b-instant",
+#     temperature=0.8,
+#     max_tokens=120
+# )
+# def ask_question(state: State) -> State:
+#     print("\n----->Ask a question")
+#     question = "What is your question?"
+#     print(question)
+#     return State(messages = [AIMessage(question),HumanMessage(input())])
+
+# def chatbot(state: State) -> State:
+#     print("\n---------> ENTERING Chatbot")
+
+#     system_message = SystemMessage(
+#         content=f"""Here's a quick summary of what's been discussed so far:
+# {state.get("summary", "")}
+
+# Keep this in mind as you answer the next question."""
+#     )
+
+#     response = chat.invoke([system_message] + list(state["messages"]))
+#     response.pretty_print()
+
+#     return {
+#         "messages": list(state["messages"]) + [response] #list(state["messages"])(list to create copy as state["messages is immutable"] it stores AIMessage and HumanMessage) + [response] appends AI's response to the existing converastion  
+#     }
+
+# def ask_another_question(state: State) -> State:
+#     print("\n----->Ask another question")
+#     for i in state["messages"]:
+#         i.pretty_print()
+#     question = "Would you like to ask  one more question (yes/no)?"
+#     print(question)
+#     return State(messages = [AIMessage(question),HumanMessage(input())])
+
+# def summarize_and_delete(state: State) -> State:
+#     print(f"\n------------> ENTERING trim_messages: ")
+#     new_conversation = ""
+#     for i in state["messages"]:
+#         new_conversation += f"{i.type}:{i.content}\n\n"
+#     summary_instructions = f'''update ongoing summary by incorporating the new lines of conversation below. Build upon the previous summary rather than repeating it so that the result reflests the most recent contexts and developments.
+#     Previous Summary
+#     {state.get("summary","")}
+#     New Conversation
+#     {new_conversation}'''
+#     print(summary_instructions)
+#     summary = chat.invoke([HumanMessage(summary_instructions)])
+#     remove_messages = [RemoveMessage(id=i.id) for i in state["messages"][:]]
+#     return State(messages=remove_messages, summary=summary.content)
+
+# ### define a routing function
+# def routing_function(state: State):
+#     last_message = state["messages"][-1]
+
+#     if last_message.content.lower() == "yes":
+#         return "summarize_and_delete"
+#     return END
+    
+# # Define graph
+# graph = StateGraph(State)
+
+# graph.add_node("ask_question",ask_question)
+# graph.add_node("chatbot",chatbot)
+# graph.add_node("ask_another_question",ask_another_question)
+# graph.add_node("summarize_and_delete",summarize_and_delete)
+
+# graph.add_edge(START,"ask_question")
+# graph.add_edge("ask_question","chatbot")
+# graph.add_edge("chatbot","ask_another_question")
+# graph.add_conditional_edges(
+#     "ask_another_question",
+#     routing_function,
+#     path_map={
+#         "summarize_and_delete": "summarize_and_delete",
+#         END: END
+#     }
+# )
+# graph.add_edge("summarize_and_delete","ask_question")
+# graph_compiled = graph.compile()
+# graph_compiled.get_graph().draw_mermaid()
+# graph_compiled.invoke(State(messages = []))
 
 # REMNOVE MESSAGES - TRIMMING
 # from dotenv import load_dotenv
