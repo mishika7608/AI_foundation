@@ -2,7 +2,6 @@
 #short term - thread scope memory (1 thread) (terminates on kernel restart,sytem shutdown)
 #long term - (<1 thread) (ext storage)
 
-
 from dotenv import load_dotenv
 load_dotenv()
 from langgraph.graph import START, END, StateGraph, add_messages, MessagesState #MessagesState-built in state schema {"messages": list[BaseMessage]}
@@ -73,9 +72,14 @@ graph_compiled = graph.compile(checkpointer)
 config1 = {"configurable":{"thread_id":'1'}}
 graph_compiled.invoke(State(), config1)
 
-
-
-
+graph_states = [i for i in graph_compiled.get_state_history(config1)]
+for i in graph_states[::1]:
+    print(f'''
+        Messages: {i.values["messages"]}
+        Summary: {i.values.get("summary", "")}
+        Next: {i.next}
+        Step: {i.metadata["step"]}
+          ''')
 
 
 
