@@ -27,3 +27,13 @@ pc.create_index(
     )
 )
 print(pc.list_indexes())
+
+#UPSERTING- Updating and inserting data
+index = pc.Index(name=index_name)
+index.upsert([
+    ("Dog",[4.,0.,1.]),
+    ("Cat",[4.,0.,1.]),
+    ("Chicken",[2.,2.,1.]),
+    ("Mantis",[6.,2.,3.]),
+    ("Elephant",[4.,0.,1.])
+])
