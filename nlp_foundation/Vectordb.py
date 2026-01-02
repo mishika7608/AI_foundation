@@ -1,7 +1,3 @@
-# CONVERT - WORDS TO VECTORS
-# NLP (Bag of words(freq based), TF-IDF(overall freq in all docs))
-# NERUAL NETWORK - Word to vector (google) - predict a word from given context and vice versa 
-# TRANSFORMER & LLM- BERT(embedding change on context), ELMO(Embedding from Language Model) - LSTM(Long Short term memory)
 import pandas as pd
 from dotenv import load_dotenv, find_dotenv
 load_dotenv()
@@ -11,12 +7,24 @@ from sentence_transformers import SentenceTransformer
 load_dotenv(find_dotenv(), override=True)
 pc= Pinecone(api_key = os.environ.get("PINECONE_API_KEY"), environment = os.environ.get('PINECONE_ENV'))
 
-files = pd.read_csv(r"D:\PythonFolder\nlp_foundation\course_descriptions.csv", encoding="ANSI")
+files = pd.read_csv(r"nlp_foundation\course_section_descriptions.csv", encoding="ANSI")
+files["unique_id"] = files["course_id"].astype(str)+ '-'+files["section_id"].astype(str)
 
-def create_course_description(row):
-    return f'''The course name is the {row["course_name"]}, the slug is  {row["course_slug"]}, the technology is  {row["course_technology"]} and the course is  {row["course_topic"]}'''
-files['course_description_new'] = files.apply(create_course_description, axis=1)
+files["metadata"] = files.apply(lambda row : {
+    "course_name": row["course_name"],
+    "section_name": row["section_name"],
+    "section_description": row["section_description"],
+}, axis=1)
 
+def create_embeddings(row):
+    combined_text = f'''{row["course_name"]} {row["course_technology"]}
+                        {row["course_description"]} {row["section_name"]} {row["section_description"]}'''
+    return model.encode(combined_text, show_progress_bar=False)
+
+model = SentenceTransformer("all-MiniLM-L6-v2")
+files["embedding"] = files.apply(create_embeddings, axis=1)
+
+#Upsert the data
 index_name = "my-index"
 dimension=384
 metric="cosine"
@@ -38,30 +46,97 @@ pc.create_index(
 )
 index= pc.Index(index_name)
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
-def create_embeddings(row):
-    combined_text = ' '.join([str(row[field]) for field in ["course_description","course_description_new","course_description_short"]])
-    embedding = model.encode(combined_text, show_progress_bar=False)
-    return embedding
-files["embedding"] = files.apply(create_embeddings, axis=1)
-vectors_to_upsert  = [(str(row["course_name"]),row["embedding"].tolist()) for _, row in files.iterrows()]
-index.upsert(vectors =vectors_to_upsert)
-print("Data upserted to pinecone index")
+vectors_to_upsert = [(row["unique_id"], row["embedding"].tolist(), row["metadata"]) for index, row in files.iterrows()]
+index.upsert(vectors = vectors_to_upsert)
 
-query = "clustering" 
-query_embedding = model.encode(query, show_progress_bar=False).tolist()
+query = "clustering"
+query_embedding  = model.encode(query, show_progress_bar=False).tolist()
 query_results = index.query(
-    vector = [query_embedding],
+    vector=[query_embedding],
     top_k=12,
-    include_values = True
+    include_metadata=True
 )
+score_threshold=0.3
 
-print(query_results)
-
-score_threshold = 0.3
 for match in query_results["matches"]:
-    if match["score"]>=score_threshold:
-        print(f"Matched item ID: {match['id']}, score: {match['score']}")
+    if match["score"] >=score_threshold:
+        course_details = match.get('metadata',{})
+        course_name = course_details.get('course_name','N/A')
+        section_name = course_details.get('section_name','N/A')
+        section_description = course_details.get('section_description','No description available')
+
+        print(f"matched item ID: {match['id']}, Score: {match['score']}")
+        print(f"Course: {course_name}, \nSection: {section_name} \nDescription: {section_description}")
+        
+
+
+
+
+
+# CONVERT - WORDS TO VECTORS
+# NLP (Bag of words(freq based), TF-IDF(overall freq in all docs))
+# NERUAL NETWORK - Word to vector (google) - predict a word from given context and vice versa 
+# TRANSFORMER & LLM- BERT(embedding change on context), ELMO(Embedding from Language Model) - LSTM(Long Short term memory)
+# import pandas as pd
+# from dotenv import load_dotenv, find_dotenv
+# load_dotenv()
+# from pinecone import Pinecone, ServerlessSpec
+# import os
+# from sentence_transformers import SentenceTransformer
+# load_dotenv(find_dotenv(), override=True)
+# pc= Pinecone(api_key = os.environ.get("PINECONE_API_KEY"), environment = os.environ.get('PINECONE_ENV'))
+
+# files = pd.read_csv(r"D:\PythonFolder\nlp_foundation\course_descriptions.csv", encoding="ANSI")
+
+# def create_course_description(row):
+#     return f'''The course name is the {row["course_name"]}, the slug is  {row["course_slug"]}, the technology is  {row["course_technology"]} and the course is  {row["course_topic"]}'''
+# files['course_description_new'] = files.apply(create_course_description, axis=1)
+
+# index_name = "my-index"
+# dimension=384
+# metric="cosine"
+
+# if index_name in [index.name for index in pc.list_indexes()]:
+#     pc.delete_index(index_name)
+#     print(f"{index_name} successfully deleted")
+# else:
+#     print(f"{index_name} not in index list")
+
+# pc.create_index(
+#     name=index_name,
+#     dimension=dimension,
+#     metric="cosine",
+#     spec=ServerlessSpec(
+#         cloud='aws',
+#         region='us-east-1'
+#     )
+# )
+# index= pc.Index(index_name)
+
+# model = SentenceTransformer("all-MiniLM-L6-v2")
+# def create_embeddings(row):
+#     combined_text = ' '.join([str(row[field]) for field in ["course_description","course_description_new","course_description_short"]])
+#     embedding = model.encode(combined_text, show_progress_bar=False)
+#     return embedding
+# files["embedding"] = files.apply(create_embeddings, axis=1)
+# vectors_to_upsert  = [(str(row["course_name"]),row["embedding"].tolist()) for _, row in files.iterrows()]
+# index.upsert(vectors =vectors_to_upsert)
+# print("Data upserted to pinecone index")
+
+# query = "clustering" 
+# query_embedding = model.encode(query, show_progress_bar=False).tolist()
+# query_results = index.query(
+#     vector = [query_embedding],
+#     top_k=12,
+#     include_values = True
+# )
+
+# print(query_results)
+
+# score_threshold = 0.3
+# for match in query_results["matches"]:
+#     if match["score"]>=score_threshold:
+#         print(f"Matched item ID: {match['id']}, score: {match['score']}")
 
 # from dotenv import load_dotenv, find_dotenv
 # load_dotenv()
