@@ -58,8 +58,10 @@ query_results = index.query(
 
 print(query_results)
 
+score_threshold = 0.3
 for match in query_results["matches"]:
-    print(f"Matched item ID: {match['id']}, score: {match['score']}")
+    if match["score"]>=score_threshold:
+        print(f"Matched item ID: {match['id']}, score: {match['score']}")
 
 # from dotenv import load_dotenv, find_dotenv
 # load_dotenv()
