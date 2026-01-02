@@ -58,6 +58,9 @@ query_results = index.query(
 
 print(query_results)
 
+for match in query_results["matches"]:
+    print(f"Matched item ID: {match['id']}, score: {match['score']}")
+
 # from dotenv import load_dotenv, find_dotenv
 # load_dotenv()
 # from datasets import load_dataset
