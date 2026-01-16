@@ -56,4 +56,13 @@ print(calculated_wer)
 print(calculated_cer)
 
 
-
+S = librosa.stft(audio_signal)
+S_db = librosa.amplitude_to_db(abs(S), ref=np.max)
+np.max(S_db)
+plt.figure(figsize=(12,4))
+librosa.display.specshow(data=S_db, sr=sample_rate, x_axis='time',y_axis='log')
+plt.colorbar(format='%+2.0f dB')
+plt.title('Spectogram')
+plt.xlabel('Time')
+plt.ylabel('Frequency')
+plt.show()
