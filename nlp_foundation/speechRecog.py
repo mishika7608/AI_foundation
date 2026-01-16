@@ -39,3 +39,21 @@ def transcribe_audio(file_path):
         return text
 transcribed_text = transcribe_audio(file_path) 
 print(transcribed_text)
+
+# (Word Error rate)WER = (insertion(cat->the cat) + deletion(the ball->ball) + substitution(cat->bat))/no. of words [less WER high accuracy]
+# (character Error rate)CER = (insertion(char added) + deletion(char deleted) + substitution(char changed))/no. of words [less WER high accuracy]
+
+# Reference transcript - ground truth
+ground_truth = """My name is Ivan ans I am excited to have as a part of our learning community!
+Before we get started, I'd like to tell you a little bit about myself. I'm a sound engineer turned data scientist,
+curious about machine learning and Artificial Intelligence. My professional background is primarily in media production with a focus on audio, IT, and communications
+"""
+
+calculated_wer = wer(ground_truth, transcribed_text)
+calculated_cer = cer(ground_truth, transcribed_text)
+
+print(calculated_wer)
+print(calculated_cer)
+
+
+
