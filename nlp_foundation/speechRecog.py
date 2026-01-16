@@ -26,3 +26,16 @@ plt.ylabel('Amplitude')
 plt.show()
 Audio(r'nlp_foundation\speech_01.wav')
 
+
+#clipping = distortion - change that makes sound harsh
+recognizer = sr.Recognizer()
+file_path = r'nlp_foundation\speech_01.wav'
+
+def transcribe_audio(file_path):
+    with sr.AudioFile(file_path) as source:
+        audio_data = recognizer.record(source)
+        text = recognizer.recognize_google(audio_data)
+        print(text)
+        return text
+transcribed_text = transcribe_audio(file_path) 
+print(transcribed_text)
