@@ -1,8 +1,26 @@
 import streamlit as st
 
-prompt = st.chat_input("Type your message", max_chars=50)
-if prompt: 
-    st.write(f"User message: {prompt}")
+# NESTED BUTTONS
+st.title("Nested button example")
+
+if 'show_second_button' not in st.session_state:
+    st.session_state.show_second_button = False
+
+if st.button("First button"):
+    st.session_state.show_second_button = True
+
+
+if st.button("first Button"):
+    st.write("Revealed")
+    if st.button("second Button"):
+        st.write("Second Revealed")
+# session state- stores component state even if script run
+
+
+# TAKE USER INPUT
+# prompt = st.chat_input("Type your message", max_chars=50)
+# if prompt: 
+#     st.write(f"User message: {prompt}")
 
 
 
