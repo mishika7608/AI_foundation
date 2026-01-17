@@ -112,3 +112,10 @@ def transcribe_directory_whisper(directory_path):
             transcriptions.append({'file_name':file_name, "transcription":transcription})
     return transcriptions
 transcriptions = transcribe_directory_whisper(directory_path)
+
+output_file = "transcriptions.csv"
+with open(output_file, mode='w',newline='') as file:
+    writer=csv.writer(file)
+    writer.writerow(["Track Number", "File Name", "Transcription"])
+    for number, transcription in enumerate(transcriptions, start=1):
+        writer.writerow([number, transcription['file_name'], transcription['transcription']])
