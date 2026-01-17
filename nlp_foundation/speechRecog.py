@@ -68,21 +68,47 @@ plt.ylabel('Frequency')
 plt.show()
 
 signal_filtered = librosa.effects.preemphasis(audio_signal, coef=0.97)
-sf.write('filtered_speech_01.wav',signal_filtered, sample_rate)
-output_file = 'filtered_speech_01.wav'
+sf.write('filtered_speech_01.wav', signal_filtered, sample_rate)
 
-Sb = librosa.stft(output_file)
-S_dbb = librosa.amplitude_to_db(abs(Sb), ref=np.max)
-np.max(S_dbb)
+filtered_signal, sr = librosa.load('filtered_speech_01.wav', sr=None)
+
+Sb = librosa.stft(filtered_signal)
+S_dbb = librosa.amplitude_to_db(np.abs(Sb), ref=np.max)
+
 plt.figure(figsize=(12,4))
-librosa.display.specshow(data=S_dbb, sr=sample_rate, x_axis='time',y_axis='log')
+librosa.display.specshow(S_dbb, sr=sr, x_axis='time', y_axis='log')
 plt.colorbar(format='%+2.0f dB')
-plt.title('Spectogram')
+plt.title('Spectrogram (Pre-emphasized Signal)')
 plt.xlabel('Time')
 plt.ylabel('Frequency')
 plt.show()
-calculated_wer = wer(ground_truth, transcribed_text)
-calculated_cer = cer(ground_truth, transcribed_text)
 
+# calculated_wer = wer(ground_truth, transcribed_text)
+# calculated_cer = cer(ground_truth, transcribed_text)
+# print(calculated_wer)
+# print(calculated_cer)
+
+model = whisper.load_model("base")
+result = model.transcribe(file_path)
+
+transcribed_text_whisper = result["text"]
+print(transcribed_text_whisper)
+print(result["language"])
+calculated_wer = wer(ground_truth, transcribed_text_whisper)
+calculated_cer = cer(ground_truth, transcribed_text_whisper)
 print(calculated_wer)
 print(calculated_cer)
+
+# Preprocessing -> MEl spectogram -> pattern identify -> Language modelling(encoder-transformer-decoder) -> postprocessing
+
+directory_path = r'D:\PythonFolder\nlp_foundation\Recordings.rar'
+def transcribe_directory_whisper(directory_path):
+    transcriptions = []
+    for file_name in os.listdir(directory_path):
+        if file_name.endswith(".wav"):
+            files_path = os.path.join(directory_path, file_name)
+            result = model.transcribe(files_path)
+            transcription = result['text']
+            transcriptions.append({'file_name':file_name, "transcription":transcription})
+    return transcriptions
+transcriptions = transcribe_directory_whisper(directory_path)
